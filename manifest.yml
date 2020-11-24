@@ -1,0 +1,6 @@
+---
+applications:
+- name: app-x
+  memory: 128M
+  command: python boot.py
+  buildpack: https://github.com/cloudfoundry/buildpack-python.git
