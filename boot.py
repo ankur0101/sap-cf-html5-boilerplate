@@ -4,6 +4,9 @@ from cfenv import AppEnv
 import os
 import base64
 import json
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app1 = Flask(__name__)
 env = AppEnv()
@@ -43,7 +46,7 @@ def isValidDestination(p_path):
 	return False
 
 def getEndPoint(p_path):
-	return p_path.replace(currentDestination(p_path), "")
+	return p_path.replace(currentDestination(p_path), "", 1)
 
 HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH']
 CONNECTIVITY_PROXY = CONNECTIVITY_SERVICE.credentials["onpremise_proxy_host"] +":"+ CONNECTIVITY_SERVICE.credentials["onpremise_proxy_port"]
@@ -101,29 +104,50 @@ def makeRequest(request,endpoint,p_path):
 	#Get proxy parameters
 	connection = getProxy()
 	headers = {}
+	newURL = url+endpoint
 	
 	for h in request.headers:
-		headers[h[0]] = h[1] #request.headers.get(h)
+		if(h[0] != "Content-Length" and h[0] != "Host"):
+			headers[h[0]] = h[1] #request.headers.get(h)
 	
 	headers["Proxy-Authorization"] = connection['headers']["Proxy-Authorization"]
-	return requests.request(method= request.method, url = url+endpoint, proxies=connection['proxies'], params=request.args, data=request.get_data(), headers=headers, verify=False, timeout=1000)
+	print("URL : "+newURL)
+	print("======================")
+	print("Headers : "+str(headers))
+	print("======================")
+	print("Payload : "+str(request.get_data()))
+	print("======================")
+	print("Arguments : "+str(request.args))
+	print("======================")
+	
+	r = requests.request(method= request.method, url = newURL, proxies=connection['proxies'], params=request.args, data=request.get_data(), headers=headers, verify=False, timeout=1000)
+	r.encoding = 'utf-8'
+	print("======================")
+	print("ResponseText : "+str(r.text))
+	print("======================")
+	print("ResponseText.headers : "+str(r.headers))
+	print("======================")
+	return r
 
 @app1.route('/<path:path>', methods=HTTP_METHODS)
 def root(path):
+	print("PATH => "+str(path))
 	if (isValidDestination(path)):
-		endpoint = getEndPoint(path)
+		endpoint = getEndPoint(path)		
 		responseText = makeRequest(request,endpoint,path)
-		resp = make_response(responseText.text)
-		resp.headers = responseText.headers.items()
-		resp.cookies = responseText.cookies
-		resp.status_code = responseText.status_code
-		return resp
+		headers = {}
+		for k in responseText.headers:
+			if(k != "Content-Encoding"):
+				headers[k] = responseText.headers[k]
+		return make_response(str(responseText.text), responseText.status_code, headers)
 	else:
-		return send_from_directory('webapp', path)
+		response = send_from_directory('webapp', path, cache_timeout=0)
+		response.headers['Access-Control-Allow-Origin'] = '*'
+		return response
 	
 @app1.route('/', methods=['GET'])
 def index():
-	return send_from_directory('webapp', "index.html")	
+	return send_from_directory('webapp', "index.html", cache_timeout=0)	
 
 if __name__ == '__main__':
 	app1.run(host='0.0.0.0', port=8080, debug= True)
