@@ -5,6 +5,7 @@ import os
 import base64
 import json
 import urllib3
+import gzip
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -135,11 +136,18 @@ def root(path):
 	if (isValidDestination(path)):
 		endpoint = getEndPoint(path)		
 		responseText = makeRequest(request,endpoint,path)
+		
 		headers = {}
+		output = responseText.content
+		
 		for k in responseText.headers:
-			if(k != "Content-Encoding" and k!= 'content-encoding'):
-				headers[k] = responseText.headers[k]
-		return make_response(str(responseText.text), responseText.status_code, headers)
+			headers[k] = responseText.headers[k]
+		
+		if "Content-Encoding" in responseText.headers:
+			if(responseText.headers["Content-Encoding"] == "gzip"):
+				output = gzip.compress(responseText.content)
+		
+		return make_response(output, responseText.status_code, headers)
 	else:
 		response = send_from_directory('webapp', path, cache_timeout=0)
 		response.headers['Access-Control-Allow-Origin'] = '*'
