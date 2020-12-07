@@ -137,7 +137,7 @@ def root(path):
 		responseText = makeRequest(request,endpoint,path)
 		headers = {}
 		for k in responseText.headers:
-			if(k != "Content-Encoding"):
+			if(k != "Content-Encoding" and k!= 'content-encoding'):
 				headers[k] = responseText.headers[k]
 		return make_response(str(responseText.text), responseText.status_code, headers)
 	else:
